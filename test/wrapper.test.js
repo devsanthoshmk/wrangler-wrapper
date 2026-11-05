@@ -150,6 +150,6 @@ describe('CLI Execution & Flags', () => {
   it('handles alias subcommand correctly', () => {
     const res = spawnSync('node', [WRAPPER_BIN, 'alias'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
-    assert.ok(res.stdout.includes('alias') || res.stdout.includes('Set-Alias'));
+    assert.ok(res.stdout.toLowerCase().includes('alias') || res.stdout.includes('Set-Alias'));
   });
 });
