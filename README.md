@@ -230,18 +230,6 @@ wrangler d1 list --json | jq .
 
 ---
 
-## Testing
-
-Run the test suite:
-
-```bash
-npm test
-```
-
-The 14 integration and unit tests cover credential parsing, JSON stream safety, flag stripping, country resolution, and help output.
-
----
-
 ## License
 
 MIT. See [LICENSE](LICENSE).
