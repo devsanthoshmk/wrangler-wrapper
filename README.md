@@ -24,9 +24,46 @@ This wrapper solves Cloudflare multi-account friction:
 
 ## Installation
 
-### Method 1: Symlink to local bin (recommended)
+### Install with npm (single command for macOS, Linux, and Windows)
 
-Clone the repository and link the binary into `~/.local/bin`:
+Install globally directly from GitHub:
+
+```bash
+npm install -g devsanthoshmk/wrangler-wrapper
+```
+
+This installs `wrangler-wrapper`, `wrangler-account`, and `wrangler-country` globally across macOS, Linux, and Windows.
+
+### Alias wrangler to the wrapper (single command)
+
+To run all `wrangler` commands through the wrapper automatically, run:
+
+```bash
+wrangler-wrapper alias
+```
+
+This command detects your shell configuration file (`~/.zshrc`, `~/.bashrc`, `config.fish`, or Windows PowerShell `$PROFILE`) and writes the alias.
+
+To add the alias manually instead:
+
+```bash
+# Zsh (macOS / Linux)
+echo 'alias wrangler="wrangler-wrapper"' >> ~/.zshrc && source ~/.zshrc
+
+# Bash (Linux / Git Bash)
+echo 'alias wrangler="wrangler-wrapper"' >> ~/.bashrc && source ~/.bashrc
+
+# PowerShell (Windows)
+Add-Content $PROFILE 'Set-Alias -Name wrangler -Value wrangler-wrapper'
+```
+
+To remove the alias later, run `wrangler-wrapper unalias`.
+
+---
+
+### Alternative: Git clone and symlink
+
+For systems without global npm permissions:
 
 ```bash
 git clone https://github.com/devsanthoshmk/wrangler-wrapper.git ~/.local/share/wrangler-wrapper
@@ -39,25 +76,10 @@ ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wran
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-account
 ```
 
-Make sure `~/.local/bin` comes before your global node path in `$PATH`:
+Make sure `~/.local/bin` is in `$PATH`:
 
 ```bash
 export PATH="$HOME/.local/bin:$PATH"
-```
-
-Running `which wrangler` should now point to `/home/<user>/.local/bin/wrangler`.
-
-### Method 2: Global npm link
-
-```bash
-cd /path/to/wrangler-wrapper
-npm link
-```
-
-Add an alias to your shell configuration file (`~/.bashrc` or `~/.zshrc`):
-
-```bash
-alias wrangler="wrangler-wrapper"
 ```
 
 ---

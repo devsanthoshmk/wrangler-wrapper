@@ -4,7 +4,9 @@
   "description": "Switch Cloudflare Wrangler accounts and profiles instantly. Multi-account manager and country switcher with active account email output for developers and AI agents.",
   "main": "src/cli.js",
   "bin": {
-    "wrangler-wrapper": "./bin/wrangler-wrapper.js"
+    "wrangler-wrapper": "./bin/wrangler-wrapper.js",
+    "wrangler-account": "./bin/wrangler-wrapper.js",
+    "wrangler-country": "./bin/wrangler-wrapper.js"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

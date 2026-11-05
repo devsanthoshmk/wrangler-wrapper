@@ -17,6 +17,7 @@ const {
 } = require('./profiles');
 const { atomicWriteJsonSync, readJsonSync } = require('./utils');
 const { runWrangler, formatEmailBanner } = require('./runner');
+const { setupAlias, removeAlias } = require('./alias');
 
 function getWrapperHelpText() {
   return `
@@ -30,6 +31,8 @@ WRAPPER COMMANDS (Multi-Country & Multi-Account for AI Agents)
   wrangler account add <name> [flags]    Add a profile (--country <c> --token <t> --email <e>)
   wrangler account remove <name>         Remove a saved profile
   wrangler account refresh [name]        Update cached metadata from Cloudflare API
+  wrangler-wrapper alias                 Add alias to your shell config (.bashrc/.zshrc/PowerShell)
+  wrangler-wrapper unalias               Remove alias from your shell config
 
 WRAPPER FLAGS (Applicable to ANY Wrangler command)
   --country <code|name>     Run command using the account for that country (e.g. --country US)
@@ -311,6 +314,14 @@ async function main() {
   if (first === 'account' || first === 'country' || first === 'profile') {
     const handled = await handleProfileCommands(rawArgs);
     if (handled !== false) return;
+  }
+  if (first === 'alias' || first === 'setup-alias') {
+    setupAlias();
+    process.exit(0);
+  }
+  if (first === 'unalias' || first === 'remove-alias') {
+    removeAlias();
+    process.exit(0);
   }
 
   // Parse per-command selection flags: --country, --profile, --account

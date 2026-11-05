@@ -146,4 +146,10 @@ describe('CLI Execution & Flags', () => {
     assert.ok(resAccount.stdout.includes('wrangler account - Multi-account profile management'));
     assert.ok(resAccount.stdout.includes('wrangler account switch'));
   });
+
+  it('handles alias subcommand correctly', () => {
+    const res = spawnSync('node', [WRAPPER_BIN, 'alias'], { encoding: 'utf8' });
+    assert.equal(res.status, 0);
+    assert.ok(res.stdout.includes('alias') || res.stdout.includes('Set-Alias'));
+  });
 });
