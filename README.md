@@ -1,6 +1,6 @@
 # Wrangler account switch and profile manager
 
-A CLI wrapper for Cloudflare Wrangler that switches accounts and profiles with one command, tags accounts by country code, and prints the active account email on every run.
+A CLI wrapper for Cloudflare multi-account management that switches accounts and profiles with one command, tags accounts by country code, and prints the active account email on every run.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -14,11 +14,11 @@ Cloudflare Wrangler stores credentials in one global file. Switching accounts na
 
 Standard Wrangler also omits the logged-in email from output during `wrangler dev` or `wrangler deploy`. Developers and automated AI agents cannot verify which account ran a command without running a separate `wrangler whoami` check, which takes 2.5 seconds per run.
 
-This wrapper fixes both issues:
+This wrapper solves Cloudflare multi-account friction:
 - Switches accounts instantly with `wrangler account switch <name|email|country>` or the `--account` flag.
 - Isolates tokens into separate profile directories under `~/.config/wrangler-wrapper/profiles/`. Cloudflare token refreshes stay inside each profile sandbox.
 - Prints the active account email as line 1 on every command in under 5 milliseconds.
-- Redirects the email header to stderr when `--json` or `--pipe` is present, keeping stdout valid for `jq` and binary downloads.
+- Redirects the email header to stderr when `--json` or `--pipe` is present so stdout stays valid for `jq` and binary downloads.
 
 ---
 
@@ -96,9 +96,9 @@ Getting User settings...
 
 ---
 
-## How to switch accounts
+## How to switch accounts in Wrangler
 
-### Switch the active profile globally
+### Switch active profile globally (wrangler switch profile)
 
 Switch your default active account by profile name, email address, or country tag:
 
@@ -113,7 +113,7 @@ wrangler account switch user@example.com
 wrangler country switch IN
 ```
 
-When you switch profiles, the wrapper updates the active profile pointer and synchronizes `~/.config/.wrangler/config/default.toml`. Third-party tools that invoke Wrangler directly continue to use the active profile credentials.
+When you switch profiles with `wrangler account switch` or `wrangler country switch`, the wrapper updates the active profile pointer and synchronizes `~/.config/.wrangler/config/default.toml`. Third-party tools that invoke Wrangler directly continue to use the active profile credentials.
 
 ### Switch accounts for a single command
 
@@ -133,7 +133,7 @@ WRANGLER_ACCOUNT=staging wrangler dev
 WRANGLER_COUNTRY=IN wrangler deploy
 ```
 
-The wrapper removes the `--account` and `--country` flags before handing execution to Wrangler, preventing argument parse errors.
+The wrapper removes the `--account` and `--country` flags before executing Wrangler to prevent argument parse errors.
 
 ### Add a new account
 
@@ -223,7 +223,7 @@ wrangler d1 list --json | jq .
                 └── default.toml
 ```
 
-1. **Path resolution without recursion.** When installed as `~/.local/bin/wrangler`, the wrapper searches `$PATH` for the next `wrangler` executable. It inspects canonical paths with `fs.realpathSync()` and skips candidate files containing its own header marker, avoiding infinite execution loops.
+1. **Path resolution without recursion.** When installed as `~/.local/bin/wrangler`, the wrapper searches `$PATH` for the next `wrangler` executable. It inspects canonical paths with `fs.realpathSync()` and skips candidate files containing its own header marker to prevent infinite execution loops.
 2. **Profile isolation.** Wrangler determines its config directory via `XDG_CONFIG_HOME`. For each profile, the wrapper sets `XDG_CONFIG_HOME=~/.config/wrangler-wrapper/profiles/<name>`. Each account keeps its own token file and refreshes OAuth tokens independently.
 3. **Sub-5ms startup.** The wrapper caches the resolved email, account name, and account ID in `profile.json`. Commands read this JSON file directly instead of making network calls or running Wrangler subprocesses.
 4. **Process control.** The wrapper uses `child_process.spawn()` with `stdio: 'inherit'`. Interactive hotkeys in `wrangler dev` (such as `b` to open browser, `r` to reload, and `x` to quit) work normally. Signals (`SIGINT`, `SIGTERM`, `SIGHUP`) pass straight through to the child process.
