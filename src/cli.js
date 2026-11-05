@@ -21,15 +21,15 @@ const { runWrangler, formatEmailBanner } = require('./runner');
 function getWrapperHelpText() {
   return `
 WRAPPER COMMANDS (Multi-Country & Multi-Account for AI Agents)
-  wrangler country list                  🌐 List all accounts and their assigned country tags
-  wrangler country switch <code>         🔄 Switch active account by country code (e.g. US, IN, UK)
-  wrangler account list                  📋 List all saved profiles and Cloudflare accounts
-  wrangler account switch <name|email>   🔄 Switch active profile (by name, email, or country)
-  wrangler account current               📍 Display currently active account, email, and country
-  wrangler account set-country <id> <c>  🏷️  Assign a country tag to an account profile
-  wrangler account add <name> [flags]    ➕ Add a profile (--country <c> --token <t> --email <e>)
-  wrangler account remove <name>         🗑️  Remove a saved profile
-  wrangler account refresh [name]        🔄 Update cached metadata from Cloudflare API
+  wrangler country list                  List all accounts and their assigned country tags
+  wrangler country switch <code>         Switch active account by country code (e.g. US, IN, UK)
+  wrangler account list                  List all saved profiles and Cloudflare accounts
+  wrangler account switch <name|email>   Switch active profile (by name, email, or country)
+  wrangler account current               Display currently active account, email, and country
+  wrangler account set-country <id> <c>  Assign a country tag to an account profile
+  wrangler account add <name> [flags]    Add a profile (--country <c> --token <t> --email <e>)
+  wrangler account remove <name>         Remove a saved profile
+  wrangler account refresh [name]        Update cached metadata from Cloudflare API
 
 WRAPPER FLAGS (Applicable to ANY Wrangler command)
   --country <code|name>     Run command using the account for that country (e.g. --country US)

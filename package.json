@@ -1,7 +1,7 @@
 {
   "name": "wrangler-wrapper",
   "version": "1.0.0",
-  "description": "Multi-account and country-aware wrapper for Cloudflare Wrangler with automatic account email output for AI agents",
+  "description": "Switch Cloudflare Wrangler accounts and profiles instantly. Multi-account manager and country switcher with active account email output for developers and AI agents.",
   "main": "src/cli.js",
   "bin": {
     "wrangler-wrapper": "./bin/wrangler-wrapper.js"
@@ -11,10 +11,18 @@
   },
   "keywords": [
     "wrangler",
-    "cloudflare",
+    "wrangler-account-switch",
+    "wrangler-switch",
+    "cloudflare-wrangler",
+    "cloudflare-account-switch",
+    "cloudflare-multi-account",
+    "wrangler-multi-account",
+    "wrangler-profile",
+    "cloudflare-workers",
+    "account-switcher",
+    "profile-switcher",
     "ai-agents",
-    "multi-account",
-    "profile"
+    "cloudflare-cli"
   ],
   "author": "Santhosh MK <connectwithsanthoshmk@gmail.com>",
   "repository": {
