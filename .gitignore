@@ -1,0 +1,11 @@
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.wrangler/
+.env
+.env.*
+!.env.example
+*.tmp*
+.DS_Store
+.agent/

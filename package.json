@@ -1,0 +1,25 @@
+{
+  "name": "wrangler-wrapper",
+  "version": "1.0.0",
+  "description": "Multi-account and country-aware wrapper for Cloudflare Wrangler with automatic account email output for AI agents",
+  "main": "src/cli.js",
+  "bin": {
+    "wrangler-wrapper": "./bin/wrangler-wrapper.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "wrangler",
+    "cloudflare",
+    "ai-agents",
+    "multi-account",
+    "profile"
+  ],
+  "author": "Santhosh MK <connectwithsanthoshmk@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devsanthoshmk/wrangler-wrapper.git"
+  },
+  "license": "MIT"
+}
