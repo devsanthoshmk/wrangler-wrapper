@@ -1,6 +1,6 @@
 # Cloudflare Wrangler multi-account manager and profile switcher
 
-A zero-dependency CLI wrapper for Cloudflare Wrangler that manages multiple Cloudflare accounts, switches active profiles, tags accounts by country code, and prints the active account email on every run.
+A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts, switches active profiles, tags accounts by country code, and prints the active account email on every run.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
