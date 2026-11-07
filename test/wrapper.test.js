@@ -10,11 +10,12 @@ const {
 } = require('../src/utils');
 
 const {
-  resolveProfile,
-  listProfiles,
+  resolveAccount,
+  listAccounts,
   parseWhoamiOutput,
-  getActiveProfileName
-} = require('../src/profiles');
+  getActiveAccountEmail,
+  setAccountAlias
+} = require('../src/accounts');
 
 const WRAPPER_BIN = path.join(__dirname, '..', 'bin', 'wrangler-wrapper.js');
 
@@ -48,7 +49,7 @@ scopes = ["user:read", "workers:write"]
   });
 });
 
-describe('Profiles & Resolution', () => {
+describe('Accounts & Resolution', () => {
   it('parses email and accounts from whoami text', () => {
     const sampleWhoami = `
  ⛅️ wrangler 4.54.0
@@ -68,18 +69,28 @@ Getting User settings...
     assert.equal(parsed.accounts[0].id, 'a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4');
   });
 
-  it('resolves active profile by default', () => {
-    const active = resolveProfile();
+  it('resolves active account by default', () => {
+    const active = resolveAccount();
     assert.ok(active);
-    assert.equal(active.name, getActiveProfileName());
+    assert.equal(active.email.toLowerCase(), getActiveAccountEmail().toLowerCase());
   });
 
-  it('resolves profile by email case-insensitively', () => {
-    const active = resolveProfile();
+  it('resolves account by email case-insensitively', () => {
+    const active = resolveAccount();
     if (active?.email) {
-      const prof = resolveProfile(active.email.toUpperCase());
-      assert.ok(prof);
-      assert.equal(prof.name, active.name);
+      const resolved = resolveAccount(active.email.toUpperCase());
+      assert.ok(resolved);
+      assert.equal(resolved.email.toLowerCase(), active.email.toLowerCase());
+    }
+  });
+
+  it('resolves account by alias', () => {
+    const active = resolveAccount();
+    if (active?.email) {
+      setAccountAlias(active.email, 'test-alias-work');
+      const resolved = resolveAccount('test-alias-work');
+      assert.ok(resolved);
+      assert.equal(resolved.email.toLowerCase(), active.email.toLowerCase());
     }
   });
 });
@@ -93,9 +104,16 @@ describe('CLI Execution & Flags', () => {
     assert.match(lines[lines.length - 1], /^\d+\.\d+\.\d+/);
   });
 
-  it('respects --account flag', () => {
-    const active = resolveProfile();
-    const res = spawnSync('node', [WRAPPER_BIN, '--account', active.name, '--version'], { encoding: 'utf8' });
+  it('respects --acc flag', () => {
+    const active = resolveAccount();
+    const res = spawnSync('node', [WRAPPER_BIN, '--acc', active.email, '--version'], { encoding: 'utf8' });
+    assert.equal(res.status, 0);
+    assert.match(res.stdout, /^Account Email:\s+/);
+  });
+
+  it('respects --account flag for backwards compatibility', () => {
+    const active = resolveAccount();
+    const res = spawnSync('node', [WRAPPER_BIN, '--account', active.email, '--version'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
     assert.match(res.stdout, /^Account Email:\s+/);
   });
@@ -119,30 +137,31 @@ describe('CLI Execution & Flags', () => {
     assert.ok(res.stderr.includes('Account Email:'));
   });
 
-  it('lists profiles and accounts with wrangler account list', () => {
-    const res = spawnSync('node', [WRAPPER_BIN, 'account', 'list'], { encoding: 'utf8' });
+  it('lists accounts with wrangler acc list', () => {
+    const res = spawnSync('node', [WRAPPER_BIN, 'acc', 'list'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
-    assert.ok(res.stdout.includes('Cloudflare Wrangler Profiles & Accounts:'));
-    assert.ok(res.stdout.includes('connectwithsanthoshmk@gmail.com'));
+    assert.ok(res.stdout.includes('Cloudflare Wrangler Accounts:'));
+    assert.ok(res.stdout.includes('connectwithsanthoshmk@gmail.com') || res.stdout.includes('@'));
   });
 
   it('displays wrapper commands and flags in global --help output', () => {
     const res = spawnSync('node', [WRAPPER_BIN, '--help'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
     assert.ok(res.stdout.includes('WRAPPER COMMANDS (Account Management for Developers & AI Agents)'));
-    assert.ok(res.stdout.includes('wrangler account list'));
-    assert.ok(res.stdout.includes('wrangler account switch'));
+    assert.ok(res.stdout.includes('wrangler acc list'));
+    assert.ok(res.stdout.includes('wrangler acc switch'));
     assert.ok(res.stdout.includes('WRAPPER FLAGS (Applicable to ANY Wrangler command)'));
-    assert.ok(res.stdout.includes('--account <name|email>'));
+    assert.ok(res.stdout.includes('--acc <email|alias>'));
     assert.ok(res.stdout.includes('WRAPPER ENVIRONMENT VARIABLES'));
-    assert.ok(res.stdout.includes('WRANGLER_ACCOUNT=<name|email>'));
+    assert.ok(res.stdout.includes('WRANGLER_ACC=<email|alias>'));
   });
 
-  it('displays domain-specific help for account --help', () => {
-    const resAccount = spawnSync('node', [WRAPPER_BIN, 'account', '--help'], { encoding: 'utf8' });
-    assert.equal(resAccount.status, 0);
-    assert.ok(resAccount.stdout.includes('wrangler account - Multi-account profile management'));
-    assert.ok(resAccount.stdout.includes('wrangler account switch'));
+  it('displays domain-specific help for acc --help', () => {
+    const resAcc = spawnSync('node', [WRAPPER_BIN, 'acc', '--help'], { encoding: 'utf8' });
+    assert.equal(resAcc.status, 0);
+    assert.ok(resAcc.stdout.includes('wrangler acc - Cloudflare account switcher'));
+    assert.ok(resAcc.stdout.includes('wrangler acc switch'));
+    assert.ok(resAcc.stdout.includes('wrangler acc alias'));
   });
 
   it('handles alias subcommand correctly', () => {

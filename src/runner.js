@@ -1,14 +1,11 @@
 const { spawn } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const { HOME } = require('./constants');
 const { findRealWrangler, isCleanOutputRequested } = require('./utils');
-const { refreshProfile, getProfileConfigPath } = require('./profiles');
+const { refreshAccount } = require('./accounts');
 
 /**
  * Format the email banner string based on environment / user preferences
  */
-function formatEmailBanner(email, profile) {
+function formatEmailBanner(email) {
   const customFormat = process.env.WRANGLER_EMAIL_FORMAT;
   const isRaw = process.env.WRANGLER_EMAIL_RAW === '1' || process.env.WRANGLER_EMAIL_FORMAT === 'raw';
 
@@ -25,24 +22,24 @@ function formatEmailBanner(email, profile) {
 }
 
 /**
- * Executes the real Wrangler binary with isolated profile environment and
- * emits the account email id as the first line of output.
+ * Executes the real Wrangler binary with isolated account environment and
+ * emits the account email as the first line of output.
  */
-async function runWrangler(forwardedArgs, profile, options = {}) {
+async function runWrangler(forwardedArgs, account, options = {}) {
   const realWranglerBin = findRealWrangler(options.scriptPath);
 
-  // If profile has no email cached yet, try a quick refresh
-  let email = profile?.email || null;
-  if (!email && profile?.has_credentials) {
+  // If account has no email cached yet, try a quick refresh
+  let email = account?.email || null;
+  if (!email && account?.has_credentials) {
     try {
-      const refreshed = await refreshProfile(profile.name);
+      const refreshed = await refreshAccount(account.email);
       email = refreshed?.email || null;
-      if (email && profile) profile.email = email;
+      if (email && account) account.email = email;
     } catch {}
   }
 
   // Format banner
-  const bannerText = formatEmailBanner(email, profile);
+  const bannerText = formatEmailBanner(email);
 
   // Determine output stream (stdout vs stderr)
   const isPipedOrJson = isCleanOutputRequested(forwardedArgs);
@@ -61,14 +58,14 @@ async function runWrangler(forwardedArgs, profile, options = {}) {
     targetStream.write(`${bannerText}\n`);
   }
 
-  // Construct environment variables for isolated profile execution
+  // Construct environment variables for isolated account execution
   const childEnv = { ...process.env };
   childEnv.__WRANGLER_WRAPPER_ACTIVE = '1';
 
-  if (profile) {
-    childEnv.XDG_CONFIG_HOME = profile.dir;
-    if (profile.account_id && !childEnv.CLOUDFLARE_ACCOUNT_ID) {
-      childEnv.CLOUDFLARE_ACCOUNT_ID = profile.account_id;
+  if (account) {
+    childEnv.XDG_CONFIG_HOME = account.dir;
+    if (account.account_id && !childEnv.CLOUDFLARE_ACCOUNT_ID) {
+      childEnv.CLOUDFLARE_ACCOUNT_ID = account.account_id;
     }
   }
 
@@ -95,9 +92,9 @@ async function runWrangler(forwardedArgs, profile, options = {}) {
     child.on('exit', async (code, signal) => {
       // If the command was a login or logout, refresh the cached credentials
       const firstArg = forwardedArgs[0];
-      if (profile && (firstArg === 'login' || firstArg === 'logout')) {
+      if (account && (firstArg === 'login' || firstArg === 'logout')) {
         try {
-          await refreshProfile(profile.name);
+          await refreshAccount(account.email);
         } catch {}
       }
 

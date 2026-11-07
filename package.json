@@ -1,10 +1,11 @@
 {
   "name": "wrangler-wrapper",
   "version": "1.0.0",
-  "description": "Switch Cloudflare Wrangler accounts and profiles instantly. Multi-account manager and profile switcher with active account email output for developers and AI agents.",
+  "description": "Switch Cloudflare Wrangler accounts instantly. Fast multi-account switcher and active account email banner for developers and AI agents.",
   "main": "src/cli.js",
   "bin": {
     "wrangler-wrapper": "./bin/wrangler-wrapper.js",
+    "wrangler-acc": "./bin/wrangler-wrapper.js",
     "wrangler-account": "./bin/wrangler-wrapper.js"
   },
   "scripts": {
@@ -12,16 +13,15 @@
   },
   "keywords": [
     "wrangler",
+    "wrangler-acc",
     "wrangler-account-switch",
     "wrangler-switch",
     "cloudflare-wrangler",
     "cloudflare-account-switch",
     "cloudflare-multi-account",
     "wrangler-multi-account",
-    "wrangler-profile",
     "cloudflare-workers",
     "account-switcher",
-    "profile-switcher",
     "ai-agents",
     "cloudflare-cli"
   ],

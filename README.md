@@ -1,6 +1,6 @@
-# Cloudflare Wrangler multi-account manager and profile switcher
+# Cloudflare Wrangler multi-account switcher
 
-A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts, switches active profiles, and prints the active account email on every run.
+A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts, switches active credentials, and prints the authenticated account email on line 1 of every run.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
@@ -10,35 +10,35 @@ A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts
 
 ## Purpose
 
-Cloudflare Wrangler stores authentication credentials in a single global configuration file at `~/.config/.wrangler/config/default.toml`. Cloudflare OAuth uses single-use refresh token rotation. Logging into a second account invalidates active sessions for previous accounts, which forces developers to log out and re-authenticate repeatedly.
+Cloudflare Wrangler stores authentication credentials in a single global configuration file at `~/.config/.wrangler/config/default.toml`. Cloudflare OAuth uses single-use refresh token rotation. Logging into a second account invalidates active sessions for previous accounts, forcing developers to log out and re-authenticate repeatedly.
 
-Standard Wrangler also omits the logged-in email address during commands like `wrangler dev` and `wrangler deploy`. Developers and automated scripts cannot determine which account executes a command without running `wrangler whoami`, which adds 2.5 seconds of network delay per command.
+Standard Wrangler also omits the logged-in email address during commands like `wrangler dev` and `wrangler deploy`. Developers and automated AI agents cannot determine which account executes a command without running `wrangler whoami`, which adds 2.5 seconds of network latency.
 
-`wrangler-wrapper` eliminates this friction. The wrapper:
-- Isolates OAuth tokens and credentials into individual profile directories under `~/.config/wrangler-wrapper/profiles/`.
-- Switches active accounts instantly by profile name or account email.
-- Prints the authenticated account email as line 1 in under 5 milliseconds.
+`wrangler-wrapper` eliminates this friction:
+- Isolates OAuth tokens into dedicated account sandboxes under `~/.config/wrangler-wrapper/accounts/<email>/`.
+- Switches active accounts instantly by email address or optional short alias (`wrangler acc switch <email|alias>`).
+- Prints the authenticated account email on line 1 in under 5 milliseconds.
 - Redirects account banners to standard error when passing `--json`, `--pipe`, `-q`, or `--silent`, keeping standard output clean for `jq` and binary pipes.
-- Synchronizes credentials back to `~/.config/.wrangler/config/default.toml` so external tools and editors continue to function.
+- Synchronizes credentials back to `~/.config/.wrangler/config/default.toml` so IDE extensions and external tools continue to function.
 
 ---
 
 ## Architecture
 
-The wrapper acts as a transparent execution shim around the installed `wrangler` executable.
+The wrapper acts as a transparent execution shim around your installed `wrangler` executable.
 
 ```text
 ~/.config/wrangler-wrapper/
-├── active_profile          # Plain text file containing the active profile name
+├── active_account          # Plain text file containing active email address
 ├── config.json             # Global configuration and aliases
-└── profiles/
-    ├── default/
-    │   ├── profile.json    # Cached email, account ID, and account name
+└── accounts/
+    ├── user@example.com/
+    │   ├── account.json    # Cached email, account ID, and optional alias
     │   └── .wrangler/
     │       └── config/
-    │           └── default.toml  # Isolated Wrangler OAuth token
-    └── production/
-        ├── profile.json
+    │           └── default.toml  # Isolated Cloudflare OAuth token
+    └── work@company.com/
+        ├── account.json
         └── .wrangler/
             └── config/
                 └── default.toml
@@ -46,11 +46,11 @@ The wrapper acts as a transparent execution shim around the installed `wrangler`
 
 ### Isolated configuration environments
 
-The wrapper sets the `XDG_CONFIG_HOME` environment variable to the selected profile directory. Wrangler stores and refreshes credentials in `<profile-dir>/.wrangler/config/default.toml`. Refreshing tokens in one profile leaves all other profile sandboxes untouched.
+The wrapper sets `XDG_CONFIG_HOME` to the selected account directory. Wrangler stores and refreshes credentials in `<account-dir>/.wrangler/config/default.toml`. Refreshing tokens in one account leaves all other account sandboxes untouched.
 
 ### System credential synchronization
 
-When switching profiles, the wrapper removes `~/.config/.wrangler/config/default.toml` and creates a symlink to the active profile configuration file. If symlink creation fails, the wrapper copies the file. Direct calls to `wrangler` by IDE extensions or global scripts automatically use the active profile.
+When switching accounts, the wrapper replaces `~/.config/.wrangler/config/default.toml` with a symlink pointing to the active account configuration file. If symlink creation fails, the wrapper copies the file. Direct calls to `wrangler` by IDE extensions automatically use the active account.
 
 ### Binary resolution and recursion prevention
 
@@ -62,7 +62,7 @@ The wrapper executes the underlying Wrangler executable with Node.js `child_proc
 
 ### Sub-5 millisecond email banner
 
-The wrapper caches profile emails and account identifiers in `profile.json`. Commands read the local JSON file on startup and print the header before spawning Wrangler. If a profile lacks cached details, the wrapper runs a quick lookup via the Cloudflare API or `wrangler whoami` and saves the result.
+The wrapper caches authenticated emails and account identifiers in `account.json`. Commands read the local JSON file on startup and print the header before spawning Wrangler. If an account lacks cached details, the wrapper runs a quick lookup via the Cloudflare API or `wrangler whoami` and saves the result.
 
 ---
 
@@ -76,7 +76,7 @@ Install the wrapper globally with npm:
 npm install -g devsanthoshmk/wrangler-wrapper
 ```
 
-This command installs two executable entry points, `wrangler-wrapper` and `wrangler-account`.
+This command installs `wrangler-wrapper`, `wrangler-acc`, and `wrangler-account`.
 
 ### Shell alias configuration
 
@@ -101,6 +101,7 @@ chmod +x ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js
 mkdir -p ~/.local/bin
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-wrapper
+ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-acc
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-account
 ```
 
@@ -110,12 +111,12 @@ ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wran
 
 ### First run and default import
 
-On first run, the wrapper imports existing credentials from `~/.config/.wrangler/config/default.toml` into a profile named `default`.
+On first run, the wrapper imports existing credentials from `~/.config/.wrangler/config/default.toml` into an account directory named after your authenticated email.
 
-List all configured accounts and profiles:
+List all configured accounts:
 
 ```bash
-wrangler account list
+wrangler acc list
 ```
 
 Run any Wrangler command. The wrapper prints the active account email on line 1, then executes Wrangler:
@@ -137,85 +138,97 @@ Getting User settings...
 
 ---
 
-### Profile listing
+### Account listing
 
-List configured profiles, emails, and account IDs:
+List saved accounts, emails, aliases, and account IDs:
 
 ```bash
-wrangler account list
+wrangler acc list
 # or
-wrangler account ls
+wrangler acc ls
 ```
 
-Display the active profile details:
+Display the active account details:
 
 ```bash
-wrangler account current
-```
-
----
-
-### Profile switching
-
-Switch the active profile globally by name or account email:
-
-```bash
-# Switch by profile name
-wrangler account switch production
-# or
-wrangler account use production
-
-# Switch by account email
-wrangler account switch user@example.com
+wrangler acc current
 ```
 
 ---
 
-### Command-level profile overrides
+### Account switching
 
-Select a profile for a single command without modifying the global active profile:
+Switch the active account globally by email address or optional alias:
 
 ```bash
-# Select by profile name or email
-wrangler --account production deploy
-wrangler --account user@example.com d1 list
+# Switch by email address
+wrangler acc switch user@example.com
 
-# Select via profile directory name
-wrangler --profile production pages deploy
-
-# Select via environment variables
-WRANGLER_ACCOUNT=production wrangler dev
-WRANGLER_PROFILE=production wrangler whoami
+# Switch by alias
+wrangler acc switch work
 ```
 
-The wrapper removes `--account` and `--profile` flags before passing arguments to Wrangler.
+The syntax `wrangler account switch` is also supported as an alias for backwards compatibility.
 
 ---
 
-### Adding profiles
+### Assigning an optional alias
 
-Create a profile using OAuth authentication:
+Assign a short alias to an account email:
 
 ```bash
-XDG_CONFIG_HOME="$HOME/.config/wrangler-wrapper/profiles/client-work" wrangler login
+wrangler acc alias user@example.com work
 ```
 
-Create a profile using an API token:
+You can now switch or target this account using `work` instead of typing the full email.
+
+---
+
+### Command-level account overrides
+
+Select an account for a single command without modifying the global active account:
 
 ```bash
-wrangler account add production --token secret-cf-token --email user@example.com
+# Select by email address
+wrangler --acc user@example.com d1 list
+
+# Select by alias
+wrangler --acc work deploy
+
+# Select via environment variable
+WRANGLER_ACC=work wrangler dev
+```
+
+The flag `--account` is also accepted for backwards compatibility. The wrapper removes the flag before passing arguments to Wrangler.
+
+---
+
+### Adding accounts
+
+Add an account via interactive browser login:
+
+```bash
+wrangler acc add
+# or with an optional alias
+wrangler acc add --alias work
+```
+
+Add an account using a Cloudflare API token:
+
+```bash
+wrangler acc add --token secret-cf-token --email user@example.com --alias prod
 ```
 
 ---
 
-### Removing profiles
+### Removing accounts
 
-Delete a profile directory:
+Delete a saved account and its aliases:
 
 ```bash
-wrangler account remove staging
-# or
-wrangler account rm staging
+wrangler acc remove user@example.com
+# or by alias
+wrangler acc remove work
 ```
 
 ---
@@ -225,8 +238,8 @@ wrangler account rm staging
 Update cached email and account information from Cloudflare:
 
 ```bash
-wrangler account refresh
-wrangler account refresh production
+wrangler acc refresh
+wrangler acc refresh user@example.com
 ```
 
 When you execute `wrangler login` or `wrangler logout`, the wrapper updates cached metadata automatically upon process completion.
@@ -267,26 +280,26 @@ wrangler whoami --no-email
 
 | Command | Aliases | Description |
 |---|---|---|
-| `wrangler account list` | `ls` | List all saved profiles, emails, and account IDs |
-| `wrangler account current` | None | Display active profile details |
-| `wrangler account switch <target>` | `use` | Switch active profile by name or email |
-| `wrangler account add <name> [flags]` | None | Create a profile with optional `--token` and `--email` |
-| `wrangler account remove <name>` | `rm` | Remove a profile directory |
-| `wrangler account refresh [name]` | None | Refresh cached account metadata from Cloudflare |
-| `wrangler account import` | None | Import credentials from `~/.config/.wrangler/config/default.toml` into default profile |
+| `wrangler acc list` | `ls` | List all saved accounts, aliases, and account IDs |
+| `wrangler acc current` | None | Display active account details |
+| `wrangler acc switch <target>` | `use` | Switch active account by email or alias |
+| `wrangler acc alias <email> <alias>` | None | Assign a short alias to an email address |
+| `wrangler acc add [flags]` | None | Add an account via login or API token (`--token`, `--email`, `--alias`) |
+| `wrangler acc remove <target>` | `rm` | Remove a saved account and its aliases |
+| `wrangler acc refresh [target]` | None | Refresh cached account metadata from Cloudflare |
+| `wrangler acc import` | None | Import credentials from `~/.config/.wrangler/config/default.toml` |
 | `wrangler-wrapper alias` | `setup-alias` | Detect shell configuration and register `wrangler` alias |
 | `wrangler-wrapper unalias` | `remove-alias` | Remove `wrangler` alias from shell configuration |
 
-The `wrangler profile <subcommand>` syntax functions as an alias for `wrangler account <subcommand>`.
+The `wrangler account <subcommand>` syntax functions as an alias for `wrangler acc <subcommand>`.
 
 ### Command-line flags
 
 | Flag | Description |
 |---|---|
-| `--account <name\|email>` | Execute command with the profile matching this name or email |
-| `--account=<name\|email>` | Execute command with the profile matching this name or email |
-| `--profile <name>` | Execute command within this profile directory sandbox |
-| `--profile=<name>` | Execute command within this profile directory sandbox |
+| `--acc <email\|alias>` | Execute command with the account matching this email or alias |
+| `--acc=<email\|alias>` | Execute command with the account matching this email or alias |
+| `--account <email\|alias>` | Backwards-compatible alias for `--acc` |
 | `--email-only`, `--raw-email` | Print only the plain email address on line 1 |
 | `--no-email` | Suppress email banner output |
 | `--json`, `--pipe`, `-q`, `--silent` | Forwarded flags that cause wrapper to route email banner to standard error |
@@ -295,25 +308,26 @@ The `wrangler profile <subcommand>` syntax functions as an alias for `wrangler a
 
 | Variable | Description |
 |---|---|
-| `WRANGLER_ACCOUNT` | Overrides active profile by account name or email |
-| `WRANGLER_PROFILE` | Overrides active profile by directory name |
+| `WRANGLER_ACC` | Overrides active account by email or alias |
+| `WRANGLER_ACCOUNT` | Backwards-compatible alias for `WRANGLER_ACC` |
 | `WRANGLER_EMAIL_STREAM` | Directs email banner stream to `stdout` or `stderr` |
 | `WRANGLER_EMAIL_FORMAT` | Custom email banner template, or `raw` for plain email |
 | `WRANGLER_EMAIL_RAW` | Set to `1` to output only the plain email address |
 | `WRANGLER_NO_EMAIL` | Set to `1` to suppress email banner output |
-| `WRANGLER_WRAPPER_DIR` | Custom directory path for configuration and profiles |
+| `WRANGLER_WRAPPER_DIR` | Custom directory path for configuration and accounts |
 | `REAL_WRANGLER_BIN` | Explicit file path to the target Wrangler executable |
 
 ---
 
-### Profile resolution order
+### Account resolution order
 
-When resolving a profile identifier, the wrapper evaluates queries in this sequence:
-1. Exact or lowercase profile directory name.
-2. Profile email address.
-3. Profile aliases array.
+When resolving an account identifier, the wrapper evaluates queries in this sequence:
+1. Alias match from `config.json` aliases mapping.
+2. Exact email match (case-insensitive).
+3. Account alias property match.
 4. Account ID exact match.
 5. Account name substring match.
+6. Fallback to active account if query is omitted.
 
 ---
 
