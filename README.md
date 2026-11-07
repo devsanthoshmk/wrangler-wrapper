@@ -1,10 +1,12 @@
 # Cloudflare Wrangler multi-account manager and profile switcher
 
-A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts, switches active profiles, tags accounts by country code, and prints the active account email on every run.
+A zero-dependency Wrangler CLI wrapper that manages multiple Cloudflare accounts, switches active profiles, and prints the active account email on every run.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org)
 [![Wrangler](https://img.shields.io/badge/wrangler-v4-orange.svg)](https://developers.cloudflare.com/workers/wrangler/)
+
+---
 
 ## Purpose
 
@@ -14,10 +16,12 @@ Standard Wrangler also omits the logged-in email address during commands like `w
 
 `wrangler-wrapper` eliminates this friction. The wrapper:
 - Isolates OAuth tokens and credentials into individual profile directories under `~/.config/wrangler-wrapper/profiles/`.
-- Switches active accounts by profile name, account email, or country code.
-- Prints the authenticated account email as the first line of output in under 5 milliseconds.
+- Switches active accounts instantly by profile name or account email.
+- Prints the authenticated account email as line 1 in under 5 milliseconds.
 - Redirects account banners to standard error when passing `--json`, `--pipe`, `-q`, or `--silent`, keeping standard output clean for `jq` and binary pipes.
 - Synchronizes credentials back to `~/.config/.wrangler/config/default.toml` so external tools and editors continue to function.
+
+---
 
 ## Architecture
 
@@ -26,10 +30,10 @@ The wrapper acts as a transparent execution shim around the installed `wrangler`
 ```text
 ~/.config/wrangler-wrapper/
 ├── active_profile          # Plain text file containing the active profile name
-├── config.json             # Global configuration, country mappings, and aliases
+├── config.json             # Global configuration and aliases
 └── profiles/
     ├── default/
-    │   ├── profile.json    # Cached email, account ID, and country tag
+    │   ├── profile.json    # Cached email, account ID, and account name
     │   └── .wrangler/
     │       └── config/
     │           └── default.toml  # Isolated Wrangler OAuth token
@@ -60,6 +64,8 @@ The wrapper executes the underlying Wrangler executable with Node.js `child_proc
 
 The wrapper caches profile emails and account identifiers in `profile.json`. Commands read the local JSON file on startup and print the header before spawning Wrangler. If a profile lacks cached details, the wrapper runs a quick lookup via the Cloudflare API or `wrangler whoami` and saves the result.
 
+---
+
 ## Setup
 
 ### Global installation
@@ -70,7 +76,7 @@ Install the wrapper globally with npm:
 npm install -g devsanthoshmk/wrangler-wrapper
 ```
 
-This command installs three executable entry points, `wrangler-wrapper`, `wrangler-account`, and `wrangler-country`.
+This command installs two executable entry points, `wrangler-wrapper` and `wrangler-account`.
 
 ### Shell alias configuration
 
@@ -80,33 +86,13 @@ Configure your shell to run `wrangler` through the wrapper automatically:
 wrangler-wrapper alias
 ```
 
-The command detects your shell configuration file, including `.zshrc`, `.bashrc`, `config.fish`, or Windows PowerShell `$PROFILE`, and appends the alias.
+The command inspects your active environment and appends the alias to your shell profile (`~/.zshrc`, `~/.bashrc`, `~/.config/fish/config.fish`, or Windows PowerShell `$PROFILE`).
 
-To configure the alias manually:
+To remove the alias, run `wrangler-wrapper unalias`.
 
-```bash
-# Zsh
-echo 'alias wrangler="wrangler-wrapper"' >> ~/.zshrc && source ~/.zshrc
+### Manual installation via symlink
 
-# Bash
-echo 'alias wrangler="wrangler-wrapper"' >> ~/.bashrc && source ~/.bashrc
-
-# Fish
-alias -s wrangler="wrangler-wrapper"
-
-# PowerShell
-Add-Content $PROFILE 'Set-Alias -Name wrangler -Value wrangler-wrapper'
-```
-
-To remove the alias, run:
-
-```bash
-wrangler-wrapper unalias
-```
-
-### Manual installation with symlinks
-
-To install the wrapper without global npm permissions:
+Clone the repository and symlink the binary into a directory on your `$PATH`:
 
 ```bash
 git clone https://github.com/devsanthoshmk/wrangler-wrapper.git ~/.local/share/wrangler-wrapper
@@ -115,38 +101,21 @@ chmod +x ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js
 mkdir -p ~/.local/bin
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-wrapper
-ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-country
 ln -sf ~/.local/share/wrangler-wrapper/bin/wrangler-wrapper.js ~/.local/bin/wrangler-account
 ```
 
-Ensure `~/.local/bin` is present in your `$PATH`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Credential import
-
-On its first invocation, the wrapper imports existing credentials from `~/.config/.wrangler/config/default.toml` into a profile named `default`. You can also trigger this import manually:
-
-```bash
-wrangler account import
-```
+---
 
 ## Usage
 
-### Quick start
+### First run and default import
+
+On first run, the wrapper imports existing credentials from `~/.config/.wrangler/config/default.toml` into a profile named `default`.
 
 List all configured accounts and profiles:
 
 ```bash
 wrangler account list
-```
-
-Assign a country code to the default profile:
-
-```bash
-wrangler account set-country default US
 ```
 
 Run any Wrangler command. The wrapper prints the active account email on line 1, then executes Wrangler:
@@ -158,7 +127,7 @@ wrangler whoami
 Output:
 
 ```text
-Account Email: user@example.com [Country: US]
+Account Email: user@example.com
 
  ⛅️ wrangler 4.54.0
 ──────────────────────────────────────────────
@@ -166,16 +135,16 @@ Getting User settings...
 👋 You are logged in with an OAuth Token, associated with the email user@example.com.
 ```
 
+---
+
 ### Profile listing
 
-List configured profiles and their assigned country codes, emails, and account IDs:
+List configured profiles, emails, and account IDs:
 
 ```bash
 wrangler account list
 # or
 wrangler account ls
-# or
-wrangler country list
 ```
 
 Display the active profile details:
@@ -184,9 +153,11 @@ Display the active profile details:
 wrangler account current
 ```
 
+---
+
 ### Profile switching
 
-Switch the active profile globally by name, account email, or country code:
+Switch the active profile globally by name or account email:
 
 ```bash
 # Switch by profile name
@@ -196,10 +167,9 @@ wrangler account use production
 
 # Switch by account email
 wrangler account switch user@example.com
-
-# Switch by country code
-wrangler country switch IN
 ```
+
+---
 
 ### Command-level profile overrides
 
@@ -210,35 +180,33 @@ Select a profile for a single command without modifying the global active profil
 wrangler --account production deploy
 wrangler --account user@example.com d1 list
 
-# Select by country code
-wrangler --country US dev
-wrangler --country IN deploy
-
 # Select via profile directory name
 wrangler --profile production pages deploy
 
 # Select via environment variables
 WRANGLER_ACCOUNT=production wrangler dev
-WRANGLER_COUNTRY=IN wrangler deploy
 WRANGLER_PROFILE=production wrangler whoami
 ```
 
-The wrapper removes `--account`, `--country`, and `--profile` flags before passing arguments to Wrangler.
+The wrapper removes `--account` and `--profile` flags before passing arguments to Wrangler.
+
+---
 
 ### Adding profiles
 
 Create a profile using OAuth authentication:
 
 ```bash
-XDG_CONFIG_HOME="$HOME/.config/wrangler-wrapper/profiles/client-uk" wrangler login
-wrangler account set-country client-uk UK
+XDG_CONFIG_HOME="$HOME/.config/wrangler-wrapper/profiles/client-work" wrangler login
 ```
 
 Create a profile using an API token:
 
 ```bash
-wrangler account add production --country US --token secret-cf-token --email user@example.com
+wrangler account add production --token secret-cf-token --email user@example.com
 ```
+
+---
 
 ### Removing profiles
 
@@ -250,6 +218,8 @@ wrangler account remove staging
 wrangler account rm staging
 ```
 
+---
+
 ### Refreshing credentials
 
 Update cached email and account information from Cloudflare:
@@ -260,6 +230,8 @@ wrangler account refresh production
 ```
 
 When you execute `wrangler login` or `wrangler logout`, the wrapper updates cached metadata automatically upon process completion.
+
+---
 
 ### Safe output pipelines
 
@@ -287,19 +259,18 @@ To suppress the email banner completely:
 wrangler whoami --no-email
 ```
 
+---
+
 ## Configuration
 
 ### Subcommands
 
 | Command | Aliases | Description |
 |---|---|---|
-| `wrangler account list` | `ls` | List all saved profiles, country tags, emails, and account IDs |
-| `wrangler country list` | `ls` | List all profiles with country code focus |
+| `wrangler account list` | `ls` | List all saved profiles, emails, and account IDs |
 | `wrangler account current` | None | Display active profile details |
-| `wrangler account switch <target>` | `use` | Switch active profile by name, email, or country |
-| `wrangler country switch <code>` | `use` | Switch active profile by country code |
-| `wrangler account set-country <name> <code>` | None | Assign a country code to a profile |
-| `wrangler account add <name> [flags]` | None | Create a profile with optional `--country`, `--token`, and `--email` |
+| `wrangler account switch <target>` | `use` | Switch active profile by name or email |
+| `wrangler account add <name> [flags]` | None | Create a profile with optional `--token` and `--email` |
 | `wrangler account remove <name>` | `rm` | Remove a profile directory |
 | `wrangler account refresh [name]` | None | Refresh cached account metadata from Cloudflare |
 | `wrangler account import` | None | Import credentials from `~/.config/.wrangler/config/default.toml` into default profile |
@@ -312,8 +283,6 @@ The `wrangler profile <subcommand>` syntax functions as an alias for `wrangler a
 
 | Flag | Description |
 |---|---|
-| `--country <code\|name>` | Execute command with the profile mapped to this country code |
-| `--country=<code\|name>` | Execute command with the profile mapped to this country code |
 | `--account <name\|email>` | Execute command with the profile matching this name or email |
 | `--account=<name\|email>` | Execute command with the profile matching this name or email |
 | `--profile <name>` | Execute command within this profile directory sandbox |
@@ -326,7 +295,6 @@ The `wrangler profile <subcommand>` syntax functions as an alias for `wrangler a
 
 | Variable | Description |
 |---|---|
-| `WRANGLER_COUNTRY` | Overrides active profile by country code |
 | `WRANGLER_ACCOUNT` | Overrides active profile by account name or email |
 | `WRANGLER_PROFILE` | Overrides active profile by directory name |
 | `WRANGLER_EMAIL_STREAM` | Directs email banner stream to `stdout` or `stderr` |
@@ -336,15 +304,18 @@ The `wrangler profile <subcommand>` syntax functions as an alias for `wrangler a
 | `WRANGLER_WRAPPER_DIR` | Custom directory path for configuration and profiles |
 | `REAL_WRANGLER_BIN` | Explicit file path to the target Wrangler executable |
 
+---
+
 ### Profile resolution order
 
 When resolving a profile identifier, the wrapper evaluates queries in this sequence:
 1. Exact or lowercase profile directory name.
-2. Profile country tag or `country_map` entry in `config.json`.
-3. Profile email address.
-4. Profile aliases array.
-5. Account ID exact match.
-6. Account name substring match.
+2. Profile email address.
+3. Profile aliases array.
+4. Account ID exact match.
+5. Account name substring match.
+
+---
 
 ## License
 

@@ -20,9 +20,8 @@ function formatEmailBanner(email, profile) {
     return customFormat.replace('%s', email || 'not-authenticated');
   }
 
-  const countryPart = profile?.country ? ` [Country: ${profile.country}]` : '';
   const emailPart = email || 'Not Authenticated';
-  return `Account Email: ${emailPart}${countryPart}`;
+  return `Account Email: ${emailPart}`;
 }
 
 /**

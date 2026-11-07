@@ -26,7 +26,6 @@ function loadConfig() {
   ensureDirectories();
   return readJsonSync(CONFIG_FILE, {
     active_profile: 'default',
-    country_map: {},
     aliases: {}
   });
 }
@@ -96,15 +95,11 @@ function listProfiles() {
       } catch {}
     }
 
-    // Determine country
-    const country = meta.country || cfg.country_map[name.toLowerCase()] || null;
-
     profiles.push({
       name,
       email: meta.email || null,
       account_id: meta.account_id || null,
       account_name: meta.account_name || null,
-      country: country ? country.toUpperCase() : null,
       aliases: meta.aliases || [],
       has_credentials: hasCredentials || Boolean(meta.api_token),
       is_active: name === activeName,
@@ -119,11 +114,10 @@ function listProfiles() {
  * Resolve profile by identifier:
  * Matches in order:
  * 1. Name exact/lowercase
- * 2. Country (e.g. US, IN, UK)
- * 3. Email
- * 4. Alias
- * 5. Account ID
- * 6. Account Name
+ * 2. Email
+ * 3. Alias
+ * 4. Account ID
+ * 5. Account Name
  */
 function resolveProfile(identifier) {
   const profiles = listProfiles();
@@ -145,30 +139,19 @@ function resolveProfile(identifier) {
   let matched = profiles.find(p => p.name.toLowerCase() === aliased);
   if (matched) return matched;
 
-  // 2. Country match (case-insensitive)
-  matched = profiles.find(p => p.country && p.country.toLowerCase() === query);
-  if (matched) return matched;
-
-  // Check country map in config
-  if (cfg.country_map[query]) {
-    const targetName = cfg.country_map[query].toLowerCase();
-    matched = profiles.find(p => p.name.toLowerCase() === targetName);
-    if (matched) return matched;
-  }
-
-  // 3. Email match
+  // 2. Email match
   matched = profiles.find(p => p.email && p.email.toLowerCase() === query);
   if (matched) return matched;
 
-  // 4. Aliases list match
-  matched = profiles.find(p => p.aliases.some(a => a.toLowerCase() === query));
+  // 3. Aliases list match
+  matched = profiles.find(p => p.aliases && p.aliases.some(a => a.toLowerCase() === query));
   if (matched) return matched;
 
-  // 5. Account ID match
+  // 4. Account ID match
   matched = profiles.find(p => p.account_id && p.account_id.toLowerCase() === query);
   if (matched) return matched;
 
-  // 6. Account Name match (partial or full)
+  // 5. Account Name match (partial or full)
   matched = profiles.find(p => p.account_name && p.account_name.toLowerCase().includes(query));
   if (matched) return matched;
 

@@ -74,10 +74,13 @@ Getting User settings...
     assert.equal(active.name, getActiveProfileName());
   });
 
-  it('resolves profile by country case-insensitively', () => {
-    const prof = resolveProfile('us');
-    assert.ok(prof);
-    assert.equal(prof.country, 'US');
+  it('resolves profile by email case-insensitively', () => {
+    const active = resolveProfile();
+    if (active?.email) {
+      const prof = resolveProfile(active.email.toUpperCase());
+      assert.ok(prof);
+      assert.equal(prof.name, active.name);
+    }
   });
 });
 
@@ -90,10 +93,11 @@ describe('CLI Execution & Flags', () => {
     assert.match(lines[lines.length - 1], /^\d+\.\d+\.\d+/);
   });
 
-  it('respects --country flag', () => {
-    const res = spawnSync('node', [WRAPPER_BIN, '--country', 'US', '--version'], { encoding: 'utf8' });
+  it('respects --account flag', () => {
+    const active = resolveProfile();
+    const res = spawnSync('node', [WRAPPER_BIN, '--account', active.name, '--version'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
-    assert.match(res.stdout, /Account Email:.*\[Country: US\]/);
+    assert.match(res.stdout, /^Account Email:\s+/);
   });
 
   it('supports raw email format with --email-only', () => {
@@ -115,32 +119,26 @@ describe('CLI Execution & Flags', () => {
     assert.ok(res.stderr.includes('Account Email:'));
   });
 
-  it('lists profiles and accounts with wrangler country list', () => {
-    const res = spawnSync('node', [WRAPPER_BIN, 'country', 'list'], { encoding: 'utf8' });
+  it('lists profiles and accounts with wrangler account list', () => {
+    const res = spawnSync('node', [WRAPPER_BIN, 'account', 'list'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
     assert.ok(res.stdout.includes('Cloudflare Wrangler Profiles & Accounts:'));
-    assert.ok(res.stdout.includes('US'));
     assert.ok(res.stdout.includes('connectwithsanthoshmk@gmail.com'));
   });
 
   it('displays wrapper commands and flags in global --help output', () => {
     const res = spawnSync('node', [WRAPPER_BIN, '--help'], { encoding: 'utf8' });
     assert.equal(res.status, 0);
-    assert.ok(res.stdout.includes('WRAPPER COMMANDS (Multi-Country & Multi-Account for AI Agents)'));
-    assert.ok(res.stdout.includes('wrangler country list'));
-    assert.ok(res.stdout.includes('wrangler country switch'));
+    assert.ok(res.stdout.includes('WRAPPER COMMANDS (Account Management for Developers & AI Agents)'));
+    assert.ok(res.stdout.includes('wrangler account list'));
+    assert.ok(res.stdout.includes('wrangler account switch'));
     assert.ok(res.stdout.includes('WRAPPER FLAGS (Applicable to ANY Wrangler command)'));
-    assert.ok(res.stdout.includes('--country <code|name>'));
+    assert.ok(res.stdout.includes('--account <name|email>'));
     assert.ok(res.stdout.includes('WRAPPER ENVIRONMENT VARIABLES'));
-    assert.ok(res.stdout.includes('WRANGLER_COUNTRY=<code|name>'));
+    assert.ok(res.stdout.includes('WRANGLER_ACCOUNT=<name|email>'));
   });
 
-  it('displays domain-specific help for country --help and account --help', () => {
-    const resCountry = spawnSync('node', [WRAPPER_BIN, 'country', '--help'], { encoding: 'utf8' });
-    assert.equal(resCountry.status, 0);
-    assert.ok(resCountry.stdout.includes('wrangler country - Manage and switch Cloudflare accounts by country tag'));
-    assert.ok(resCountry.stdout.includes('wrangler country switch <country_code>'));
-
+  it('displays domain-specific help for account --help', () => {
     const resAccount = spawnSync('node', [WRAPPER_BIN, 'account', '--help'], { encoding: 'utf8' });
     assert.equal(resAccount.status, 0);
     assert.ok(resAccount.stdout.includes('wrangler account - Multi-account profile management'));

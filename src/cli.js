@@ -21,28 +21,23 @@ const { setupAlias, removeAlias } = require('./alias');
 
 function getWrapperHelpText() {
   return `
-WRAPPER COMMANDS (Multi-Country & Multi-Account for AI Agents)
-  wrangler country list                  List all accounts and their assigned country tags
-  wrangler country switch <code>         Switch active account by country code (e.g. US, IN, UK)
+WRAPPER COMMANDS (Account Management for Developers & AI Agents)
   wrangler account list                  List all saved profiles and Cloudflare accounts
-  wrangler account switch <name|email>   Switch active profile (by name, email, or country)
-  wrangler account current               Display currently active account, email, and country
-  wrangler account set-country <id> <c>  Assign a country tag to an account profile
-  wrangler account add <name> [flags]    Add a profile (--country <c> --token <t> --email <e>)
+  wrangler account switch <name|email>   Switch active profile (by name or email)
+  wrangler account current               Display currently active account and email
+  wrangler account add <name> [flags]    Add a profile (--token <token> --email <email>)
   wrangler account remove <name>         Remove a saved profile
   wrangler account refresh [name]        Update cached metadata from Cloudflare API
   wrangler-wrapper alias                 Add alias to your shell config (.bashrc/.zshrc/PowerShell)
   wrangler-wrapper unalias               Remove alias from your shell config
 
 WRAPPER FLAGS (Applicable to ANY Wrangler command)
-  --country <code|name>     Run command using the account for that country (e.g. --country US)
   --account <name|email>    Run command using a specific profile or email (e.g. --account work)
   --profile <name>          Run command under the specified profile directory sandbox
   --email-only, --raw-email Output only the raw email address on the first line
   --no-email                Suppress the email header line
 
 WRAPPER ENVIRONMENT VARIABLES
-  WRANGLER_COUNTRY=<code|name>  Default country for subsequent commands
   WRANGLER_ACCOUNT=<name|email> Default account for subsequent commands
   WRANGLER_PROFILE=<name>       Default profile directory for subsequent commands
   WRANGLER_EMAIL_STREAM         "stdout" (default) or "stderr" (used for clean --json output)
@@ -51,35 +46,14 @@ WRAPPER ENVIRONMENT VARIABLES
 }
 
 function printDomainHelp(domain) {
-  if (domain === 'country') {
-    console.log(`
-wrangler country - Manage and switch Cloudflare accounts by country tag
-
-COMMANDS
-  wrangler country list                  List all accounts and their country tags
-  wrangler country switch <country_code> Switch active account to the specified country
-                                         (e.g., wrangler country switch US)
-
-PER-COMMAND USAGE
-  wrangler --country <code|name> <command>
-  Example: wrangler --country US dev
-           wrangler --country IN deploy
-
-ENVIRONMENT VARIABLE
-  WRANGLER_COUNTRY=<code|name>
-  Example: WRANGLER_COUNTRY=US wrangler whoami
-`);
-  } else {
-    console.log(`
+  console.log(`
 wrangler ${domain} - Multi-account profile management
 
 COMMANDS
   wrangler ${domain} list                     List all saved profiles and Cloudflare accounts
-  wrangler ${domain} current                  Show active profile, email, account ID & country
-  wrangler ${domain} switch <name|email|tag>  Switch the active profile
-  wrangler ${domain} set-country <id> <code > Assign a country tag to an existing profile
+  wrangler ${domain} current                  Show active profile, email, and account ID
+  wrangler ${domain} switch <name|email>      Switch the active profile
   wrangler ${domain} add <name> [flags]       Add a profile:
-                                              --country <code >  Assign country tag
                                               --token <token>    Set Cloudflare API token
                                               --email <email>    Set associated email
   wrangler ${domain} remove <name>            Remove a saved profile
@@ -92,41 +66,25 @@ PER-COMMAND USAGE
   Example: wrangler --account user@example.com whoami
            wrangler --profile prod deploy
 `);
-  }
 }
 
 async function handleProfileCommands(args) {
   const [domain, subCmd, ...rest] = args;
-  // domain is 'account', 'country', or 'profile'
 
   if (subCmd === '--help' || subCmd === '-h' || subCmd === 'help') {
     printDomainHelp(domain);
     process.exit(0);
   }
 
-  if (domain === 'country') {
-    if (!subCmd || subCmd === 'list' || subCmd === 'ls') {
-      return printAccountsTable(true);
-    }
-    if (subCmd === 'switch' || subCmd === 'use') {
-      const countryCode = rest[0];
-      if (!countryCode) {
-        console.error('Usage: wrangler country switch <country_code>');
-        process.exit(1);
-      }
-      return switchProfileByQuery(countryCode);
-    }
-  }
-
   if (domain === 'account' || domain === 'profile') {
     if (!subCmd || subCmd === 'list' || subCmd === 'ls') {
-      return printAccountsTable(false);
+      return printAccountsTable();
     }
 
     if (subCmd === 'switch' || subCmd === 'use') {
       const target = rest[0];
       if (!target) {
-        console.error(`Usage: wrangler ${domain} switch <name|email|country>`);
+        console.error(`Usage: wrangler ${domain} switch <name|email>`);
         process.exit(1);
       }
       return switchProfileByQuery(target);
@@ -139,51 +97,23 @@ async function handleProfileCommands(args) {
       } else {
         console.log(`Active Profile : ${current.name}`);
         console.log(`Account Email  : ${current.email || 'unknown'}`);
-        console.log(`Country        : ${current.country || 'Not set'}`);
         console.log(`Account ID     : ${current.account_id || 'none'}`);
         console.log(`Account Name   : ${current.account_name || 'none'}`);
       }
       process.exit(0);
     }
 
-    if (subCmd === 'set-country') {
-      const [nameOrEmail, country] = rest;
-      if (!nameOrEmail || !country) {
-        console.error(`Usage: wrangler ${domain} set-country <name_or_email> <country>`);
-        process.exit(1);
-      }
-      const prof = resolveProfile(nameOrEmail);
-      if (!prof) {
-        console.error(`Profile not found: ${nameOrEmail}`);
-        process.exit(1);
-      }
-      const metaPath = getProfileMetaPath(prof.name);
-      const meta = readJsonSync(metaPath, {}) || {};
-      meta.country = country.toUpperCase();
-      atomicWriteJsonSync(metaPath, meta);
-
-      const cfg = loadConfig();
-      cfg.country_map[country.toLowerCase()] = prof.name;
-      saveConfig(cfg);
-
-      console.log(`Assigned country '${country.toUpperCase()}' to profile '${prof.name}' (${prof.email || 'no email'}).`);
-      process.exit(0);
-    }
-
     if (subCmd === 'add') {
       const name = rest[0];
       if (!name) {
-        console.error(`Usage: wrangler ${domain} add <name> [--country <country>] [--token <api_token>] [--email <email>]`);
+        console.error(`Usage: wrangler ${domain} add <name> [--token <api_token>] [--email <email>]`);
         process.exit(1);
       }
 
-      let country = null;
       let token = null;
       let email = null;
       for (let i = 1; i < rest.length; i++) {
-        if (rest[i] === '--country' && rest[i + 1]) {
-          country = rest[++i];
-        } else if (rest[i] === '--token' && rest[i + 1]) {
+        if (rest[i] === '--token' && rest[i + 1]) {
           token = rest[++i];
         } else if (rest[i] === '--email' && rest[i + 1]) {
           email = rest[++i];
@@ -196,17 +126,10 @@ async function handleProfileCommands(args) {
 
       const meta = {
         name,
-        country: country ? country.toUpperCase() : null,
         api_token: token || null,
         email: email || null
       };
       atomicWriteJsonSync(metaPath, meta);
-
-      if (country) {
-        const cfg = loadConfig();
-        cfg.country_map[country.toLowerCase()] = name;
-        saveConfig(cfg);
-      }
 
       if (token) {
         await refreshProfile(name);
@@ -250,13 +173,13 @@ async function handleProfileCommands(args) {
   return false;
 }
 
-function printAccountsTable(isCountryView) {
+function printAccountsTable() {
   const profiles = listProfiles();
   const active = getActiveProfileName();
 
   console.log(`\nCloudflare Wrangler Profiles & Accounts:`);
   console.log('────────────────────────────────────────────────────────────────────────────────────────');
-  console.log(`  ${'NAME'.padEnd(16)} ${'COUNTRY'.padEnd(10)} ${'ACCOUNT EMAIL'.padEnd(35)} ${'ACCOUNT ID'.padEnd(34)}`);
+  console.log(`  ${'NAME'.padEnd(20)} ${'ACCOUNT EMAIL'.padEnd(38)} ${'ACCOUNT ID'.padEnd(34)}`);
   console.log('────────────────────────────────────────────────────────────────────────────────────────');
 
   if (profiles.length === 0) {
@@ -264,16 +187,15 @@ function printAccountsTable(isCountryView) {
   } else {
     for (const p of profiles) {
       const prefix = p.name === active ? '* ' : '  ';
-      const name = (p.name || '').padEnd(16);
-      const country = (p.country || '-').padEnd(10);
-      const email = (p.email || (p.has_credentials ? '(run refresh)' : 'no auth')).padEnd(35);
+      const name = (p.name || '').padEnd(20);
+      const email = (p.email || (p.has_credentials ? '(run refresh)' : 'no auth')).padEnd(38);
       const accId = (p.account_id || '-').padEnd(34);
-      console.log(`${prefix}${name} ${country} ${email} ${accId}`);
+      console.log(`${prefix}${name} ${email} ${accId}`);
     }
   }
 
   console.log('────────────────────────────────────────────────────────────────────────────────────────');
-  console.log(`* indicates active profile. Switch with: wrangler account switch <name|email|country>\n`);
+  console.log(`* indicates active profile. Switch with: wrangler account switch <name|email>\n`);
   process.exit(0);
 }
 
@@ -287,7 +209,7 @@ function switchProfileByQuery(query) {
 
   setActiveProfileName(prof.name);
   syncStandardConfig(prof.name);
-  console.log(`Switched active Cloudflare profile to '${prof.name}' (Email: ${prof.email || 'unknown'}${prof.country ? ', Country: ' + prof.country : ''})`);
+  console.log(`Switched active Cloudflare profile to '${prof.name}' (Email: ${prof.email || 'unknown'})`);
   process.exit(0);
 }
 
@@ -301,17 +223,15 @@ async function main() {
 
   let rawArgs = process.argv.slice(2);
 
-  // If invoked via shortcut binary name (wrangler-country or wrangler-account)
+  // If invoked via shortcut binary name (wrangler-account or wrangler-profile)
   const scriptName = path.basename(process.argv[1] || '');
-  if (scriptName === 'wrangler-country') {
-    rawArgs = ['country', ...rawArgs];
-  } else if (scriptName === 'wrangler-account' || scriptName === 'wrangler-profile') {
+  if (scriptName === 'wrangler-account' || scriptName === 'wrangler-profile') {
     rawArgs = ['account', ...rawArgs];
   }
 
   // Check for built-in management subcommands
   const first = rawArgs[0];
-  if (first === 'account' || first === 'country' || first === 'profile') {
+  if (first === 'account' || first === 'profile') {
     const handled = await handleProfileCommands(rawArgs);
     if (handled !== false) return;
   }
@@ -324,8 +244,8 @@ async function main() {
     process.exit(0);
   }
 
-  // Parse per-command selection flags: --country, --profile, --account
-  let targetIdentifier = process.env.WRANGLER_COUNTRY || process.env.WRANGLER_ACCOUNT || process.env.WRANGLER_PROFILE || null;
+  // Parse per-command selection flags: --account, --profile
+  let targetIdentifier = process.env.WRANGLER_ACCOUNT || process.env.WRANGLER_PROFILE || null;
   const forwardedArgs = [];
   let rawEmail = false;
   let noEmail = false;
@@ -333,17 +253,13 @@ async function main() {
   for (let i = 0; i < rawArgs.length; i++) {
     const arg = rawArgs[i];
 
-    if (arg === '--country' && i + 1 < rawArgs.length) {
-      targetIdentifier = rawArgs[++i];
-    } else if (arg.startsWith('--country=')) {
-      targetIdentifier = arg.slice(10);
-    } else if (arg === '--profile' && i + 1 < rawArgs.length) {
+    if (arg === '--profile' && i + 1 < rawArgs.length) {
       targetIdentifier = rawArgs[++i];
     } else if (arg.startsWith('--profile=')) {
       targetIdentifier = arg.slice(10);
     } else if (arg === '--account' && i + 1 < rawArgs.length) {
       const val = rawArgs[i + 1];
-      // Check if value matches an existing wrapper profile, email, or country
+      // Check if value matches an existing wrapper profile or email
       const matched = resolveProfile(val);
       if (matched) {
         targetIdentifier = val;
