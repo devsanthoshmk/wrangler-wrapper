@@ -281,15 +281,22 @@ async function refreshAccount(email) {
   // 1. Try fast path via direct Cloudflare API if token exists
   if (token) {
     try {
-      const user = await fetchCloudflareUser(token);
+      const [user, accounts] = await Promise.all([
+        fetchCloudflareUser(token),
+        fetchCloudflareAccounts(token)
+      ]);
+      let changed = false;
       if (user?.email) {
         meta.email = user.email;
-        const accounts = await fetchCloudflareAccounts(token);
-        if (accounts && accounts.length > 0) {
-          meta.account_id = meta.account_id || accounts[0].id;
-          meta.account_name = meta.account_name || accounts[0].name;
-          meta.available_accounts = accounts.map(a => ({ id: a.id, name: a.name }));
-        }
+        changed = true;
+      }
+      if (accounts && accounts.length > 0) {
+        meta.account_id = accounts[0].id;
+        meta.account_name = accounts[0].name;
+        meta.available_accounts = accounts.map(a => ({ id: a.id, name: a.name }));
+        changed = true;
+      }
+      if (changed || meta.email) {
         meta.last_synced = new Date().toISOString();
         atomicWriteJsonSync(metaPath, meta);
         return meta;
@@ -432,6 +439,53 @@ async function importExistingCredentials() {
 }
 
 /**
+ * Auto-heals accounts:
+ * 1. Renames any temp-login-* directory to the discovered email
+ * 2. Caches missing account_id or account_name if credentials exist
+ */
+async function autoHealAccounts() {
+  ensureDirectories();
+  const entries = fs.readdirSync(ACCOUNTS_DIR, { withFileTypes: true });
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dirName = entry.name;
+    const aDir = getAccountDir(dirName);
+    const tomlPath = getAccountConfigPath(dirName);
+    const metaPath = getAccountMetaPath(dirName);
+
+    let meta = readJsonSync(metaPath, {}) || {};
+    const isTemp = dirName.startsWith('temp-login-') || !dirName.includes('@');
+    const missingAccountData = !meta.account_id || !meta.email;
+
+    if ((isTemp || missingAccountData) && (fs.existsSync(tomlPath) || meta.api_token)) {
+      try {
+        const refreshed = await refreshAccount(dirName);
+        const resolvedEmail = refreshed?.email;
+
+        if (resolvedEmail && resolvedEmail.includes('@')) {
+          const finalDir = getAccountDir(resolvedEmail);
+          if (finalDir !== aDir) {
+            if (fs.existsSync(finalDir)) {
+              try { fs.rmSync(finalDir, { recursive: true, force: true }); } catch {}
+            }
+            try {
+              fs.renameSync(aDir, finalDir);
+            } catch {}
+          }
+
+          const active = getActiveAccountEmail();
+          if (active === dirName) {
+            setActiveAccount(resolvedEmail);
+            syncStandardConfig(resolvedEmail);
+          }
+        }
+      } catch {}
+    }
+  }
+}
+
+/**
  * Synchronize the active account's default.toml back to ~/.config/.wrangler/config/default.toml
  */
 function syncStandardConfig(email) {
@@ -475,6 +529,7 @@ module.exports = {
   parseWhoamiOutput,
   importExistingCredentials,
   syncStandardConfig,
+  autoHealAccounts,
   // Backwards-compatible aliases
   resolveProfile: resolveAccount,
   listProfiles: listAccounts,

@@ -98,10 +98,12 @@ async function runWrangler(forwardedArgs, account, options = {}) {
         } catch {}
       }
 
-      if (signal) {
-        process.kill(process.pid, signal);
-      } else {
-        process.exit(code ?? 0);
+      if (options.exitOnFinish !== false) {
+        if (signal) {
+          process.kill(process.pid, signal);
+        } else {
+          process.exit(code ?? 0);
+        }
       }
       resolve(code ?? 0);
     });

@@ -14,6 +14,7 @@ const {
   setAccountAlias,
   removeAccountAlias,
   refreshAccount,
+  autoHealAccounts,
   importExistingCredentials,
   syncStandardConfig
 } = require('./accounts');
@@ -189,7 +190,12 @@ async function handleAccountCommands(args) {
       const tempDir = getAccountDir(tempId);
       fs.mkdirSync(path.join(tempDir, '.wrangler', 'config'), { recursive: true });
 
-      await runWrangler(['login'], { dir: tempDir, email: null }, { suppressBanner: true });
+      const loginCode = await runWrangler(['login'], { dir: tempDir, email: null }, { suppressBanner: true, exitOnFinish: false });
+      if (loginCode !== 0) {
+        console.error('Wrangler login was cancelled or failed.');
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {}
+        process.exit(loginCode || 1);
+      }
 
       // After login completes, inspect credentials in tempDir
       const refreshed = await refreshAccount(tempId);
@@ -310,6 +316,7 @@ function switchAccountByQuery(query) {
  */
 async function main() {
   ensureDirectories();
+  await autoHealAccounts();
   await importExistingCredentials();
 
   let rawArgs = process.argv.slice(2);
